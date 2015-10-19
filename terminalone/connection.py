@@ -93,9 +93,14 @@ class Connection(object):
     # these should be stored as instance vars, because they aren't specific
     # to the user. Except for redirect_uri, because that gets saved as an
     # instance var for the session
-    def authorization_url(self, api_key, client_secret, redirect_uri):
+    def authorization_url(self, api_key, redirect_uri=None):
         """Authenticate using OAuth2"""
         base_url = '/'.join(['https:/', self.api_base, PATHS['oauth2']])
+        if redirect_uri is None:
+            if not hasattr(self, 'redirect_uri'):
+                raise ClientError('Redirect URI not provided!')
+            else:
+                redirect_uri = self.redirect_uri
         self.session = OAuth2Session(client_id=api_key,
                                      redirect_uri=redirect_uri,
                                      auto_refresh_url=(base_url + '/token'))
@@ -107,7 +112,7 @@ class Connection(object):
                               PATHS['oauth2'],
                               'token'])
         token = self.session.fetch_token(token_url, code=code,
-                                         client_secret=client_secret)
+                                         client_secret=self.client_secret)
         return token
 
     def _check_session(self, user=None):
@@ -134,17 +139,7 @@ class Connection(object):
         """
         url = '/'.join(['https:/', self.api_base, path, rest])
         response = self.session.get(url, params=params, stream=True)
-        response_body = response.content
-
-        try:
-            result = XMLParser(response_body)
-        except ParseError as exc:
-            Connection.__setattr__(self, 'response', response)
-            raise ClientError('Could not parse XML response: {!r}'.format(exc))
-        except Exception:
-            Connection.__setattr__(self, 'response', response)
-            raise
-        return iter(result.entities), result.entity_count
+        return self._parse_response(response)
 
     def _post(self, path, rest, data):
         """Base method for subclasses to call.
@@ -156,8 +151,11 @@ class Connection(object):
 
         url = '/'.join(['https:/', self.api_base, path, rest])
         response = self.session.post(url, data=data, stream=True)
-        response_body = response.content
+        return self._parse_response(response)
 
+
+    def _parse_response(self, response):
+        response_body = response.content
         try:
             result = XMLParser(response_body)
         except ParseError as exc:
@@ -167,3 +165,4 @@ class Connection(object):
             Connection.__setattr__(self, 'response', response)
             raise
         return iter(result.entities), result.entity_count
+
