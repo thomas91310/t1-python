@@ -43,6 +43,7 @@ class Connection(object):
         :param _create_session: bool flag to create a Requests Session.
             Should only be used for initial T1 instantiation.
         """
+        print("Yo")
         if api_base is not None:
             Connection.__setattr__(self, 'api_base', api_base)
         else:
