@@ -176,7 +176,15 @@ class Connection(object):
         """
         url = '/'.join(['https:/', self.api_base, path, rest])
         response = self.session.get(url, params=params, stream=True)
-        return self._parse_response(response)
+
+        content_type = response.headers.get('Content-Type')
+        if content_type is None:
+            print('response headers: ', response.headers)
+            print('response status_code: ', response.status_code)
+            print('response text: ', response.text)
+            raise T1Error(None, 'No content type header returned for url {url}'.format(url=url))
+
+        return self._parse_response(content_type, response)
 
     def _post(self, path, rest, data=None, json=None):
         """Base method for subclasses to call.
@@ -191,13 +199,17 @@ class Connection(object):
 
         url = '/'.join(['https:/', self.api_base, path, rest])
         response = self.session.post(url, data=data, json=json, stream=True)
-        return self._parse_response(response)
 
-    def _parse_response(self, response):
-        content_type = response.headers.get('Content-type')
+        content_type = response.headers.get('Content-Type')
         if content_type is None:
-            raise T1Error(None, 'No content type header returned')
+            print('response headers: ', response.headers)
+            print('response status_code: ', response.status_code)
+            print('response text: ', response.text)
+            raise T1Error(None, 'No content type header returned for url {url}'.format(url=url))
 
+        return self._parse_response(content_type, response)
+
+    def _parse_response(self, content_type, response):
         parser, response_body = self._get_parser(content_type, response)
 
         try:
